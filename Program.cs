@@ -194,9 +194,9 @@ namespace TwoShipDiscordPresence
 
                                 dynamicDetails = dayStr + " (" + timeStr + ")";
                                 if (gameData.Health <= 0) {
-                                    dynamicState = "Game Over (0/" + gameData.HealthCapacity + ")";
+                                    dynamicState = "💀 Game Over (0/" + gameData.HealthCapacity + ")";
                                 } else {
-                                    dynamicState = "❤️ " + gameData.Health + "/" + gameData.HealthCapacity;
+                                    dynamicState = "❤️ " + gameData.Health.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + gameData.HealthCapacity;
                                 }
                             }
 
@@ -618,7 +618,7 @@ namespace TwoShipDiscordPresence
             public int Day;
             public ushort Time;
             public int Entrance;
-            public int Health;
+            public double Health;
             public int HealthCapacity;
             public byte EquippedMask;
             public byte PlayerForm;
@@ -676,7 +676,7 @@ namespace TwoShipDiscordPresence
                         short rawHp = BitConverter.ToInt16(buffer, 0x36);
 
                         result.HealthCapacity = rawCap > 0 ? (rawCap / 16) : 3;
-                        result.Health = rawHp > 0 ? (rawHp / 16) : 0;
+                        result.Health = rawHp > 0 ? (rawHp / 16.0) : 0;
 
                         if (result.Day >= 1 && result.Day <= 10 && result.HealthCapacity >= 1 && result.HealthCapacity <= 30) {
                             result.IsValid = true;
