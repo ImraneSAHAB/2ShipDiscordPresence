@@ -153,6 +153,7 @@ namespace TwoShipDiscordPresence
             bool wasRunning = false;
             long startTime = 0;
             DiscordRpc rpc = new DiscordRpc();
+            GameMemoryReader memReader = new GameMemoryReader();
 
             while (true) {
                 try {
@@ -183,11 +184,23 @@ namespace TwoShipDiscordPresence
                         }
 
                         if (rpc.IsConnected) {
+                            string dynamicDetails = config.details;
+                            string dynamicState = config.state;
+
+                            GameMemoryReader.GameStateData gameData = memReader.ReadGameState(targetProc.Id);
+                            if (gameData != null && gameData.IsValid) {
+                                string dayStr = FormatDay(gameData.Day);
+                                string timeStr = FormatTime(gameData.Time);
+
+                                dynamicDetails = dayStr + " (" + timeStr + ")";
+                                dynamicState = "❤️ " + gameData.Health + "/" + gameData.HealthCapacity + " • Made by Imashiro";
+                            }
+
                             string actErr;
                             if (rpc.SetActivity(
                                 targetProc.Id,
-                                config.details,
-                                config.state,
+                                dynamicDetails,
+                                dynamicState,
                                 startTime,
                                 config.large_image,
                                 config.large_text,
@@ -223,6 +236,30 @@ namespace TwoShipDiscordPresence
 
                 Thread.Sleep(config.check_interval_seconds * 1000);
             }
+        }
+
+        private static string FormatDay(int day)
+        {
+            switch (day) {
+                case 1: return "1st Day";
+                case 2: return "2nd Day";
+                case 3: return "3rd Day";
+                case 4: return "Final Hours";
+                default: return day > 4 ? "Final Hours" : "1st Day";
+            }
+        }
+
+        private static string FormatTime(ushort timeValue)
+        {
+            long totalMinutes = ((long)timeValue * 1440L) / 65536L;
+            int hours = (int)(totalMinutes / 60) % 24;
+            int minutes = (int)(totalMinutes % 60);
+
+            string ampm = hours >= 12 ? "PM" : "AM";
+            int displayHours = hours % 12;
+            if (displayHours == 0) displayHours = 12;
+
+            return string.Format("{0:D2}:{1:D2} {2}", displayHours, minutes, ampm);
         }
 
         private static Process FindTargetProcess(string processName)
@@ -535,6 +572,192 @@ namespace TwoShipDiscordPresence
         {
             if (string.IsNullOrEmpty(s)) return "";
             return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
+        }
+    }
+
+    public class GameMemoryReader
+    {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern int VirtualQueryEx(IntPtr hProcess, IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
+
+        private const uint PROCESS_VM_READ = 0x0010;
+        private const uint PROCESS_QUERY_INFORMATION = 0x0400;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MEMORY_BASIC_INFORMATION
+        {
+            public IntPtr BaseAddress;
+            public IntPtr AllocationBase;
+            public uint AllocationProtect;
+            public IntPtr RegionSize;
+            public uint State;
+            public uint Protect;
+            public uint Type;
+        }
+
+        private const uint MEM_COMMIT = 0x1000;
+        private const uint PAGE_READWRITE = 0x04;
+        private const uint PAGE_EXECUTE_READWRITE = 0x40;
+
+        public class GameStateData
+        {
+            public bool IsValid;
+            public int Day;
+            public ushort Time;
+            public int Entrance;
+            public int Health;
+            public int HealthCapacity;
+            public byte EquippedMask;
+            public byte PlayerForm;
+        }
+
+        private IntPtr cachedActiveAddr = IntPtr.Zero;
+        private ushort lastObservedTime = 0xFFFF;
+        private int cachedPid = -1;
+
+        public GameStateData ReadGameState(int pid)
+        {
+            GameStateData result = new GameStateData { IsValid = false };
+            if (pid <= 0) return result;
+
+            IntPtr hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid);
+            if (hProcess == IntPtr.Zero) return result;
+
+            try {
+                Process targetProc = Process.GetProcessById(pid);
+                IntPtr mainBase = IntPtr.Zero;
+                long mainSize = 0;
+                try {
+                    ProcessModule mainMod = targetProc.MainModule;
+                    if (mainMod != null) {
+                        mainBase = mainMod.BaseAddress;
+                        mainSize = mainMod.ModuleMemorySize;
+                    }
+                } catch { }
+
+                bool isCachedInMainModule = false;
+                if (cachedActiveAddr != IntPtr.Zero && mainBase != IntPtr.Zero && mainSize > 0) {
+                    long addr = cachedActiveAddr.ToInt64();
+                    long b = mainBase.ToInt64();
+                    isCachedInMainModule = (addr >= b && addr < b + mainSize);
+                }
+
+                if (cachedPid != pid || cachedActiveAddr == IntPtr.Zero || !isCachedInMainModule || !VerifyZelda3Magic(hProcess, cachedActiveAddr)) {
+                    cachedActiveAddr = FindActiveZelda3Address(hProcess, mainBase, mainSize);
+                    cachedPid = pid;
+                }
+
+                if (cachedActiveAddr != IntPtr.Zero) {
+                    IntPtr saveContextBase = new IntPtr(cachedActiveAddr.ToInt64() - 0x24);
+
+                    byte[] buffer = new byte[0x50];
+                    IntPtr bytesRead;
+                    if (ReadProcessMemory(hProcess, saveContextBase, buffer, buffer.Length, out bytesRead) && bytesRead.ToInt64() >= 0x40) {
+                        result.Entrance = BitConverter.ToInt32(buffer, 0x00);
+                        result.EquippedMask = buffer[0x3E];
+                        result.Time = BitConverter.ToUInt16(buffer, 0x0C);
+                        result.Day = BitConverter.ToInt32(buffer, 0x18);
+                        result.PlayerForm = buffer[0x20];
+
+                        short rawCap = BitConverter.ToInt16(buffer, 0x34);
+                        short rawHp = BitConverter.ToInt16(buffer, 0x36);
+
+                        result.HealthCapacity = rawCap > 0 ? (rawCap / 16) : 3;
+                        result.Health = rawHp > 0 ? (rawHp / 16) : 3;
+
+                        if (result.Day >= 1 && result.Day <= 10 && result.HealthCapacity >= 1 && result.HealthCapacity <= 30) {
+                            result.IsValid = true;
+                            lastObservedTime = result.Time;
+                        }
+                    }
+                }
+            } catch { }
+            finally {
+                CloseHandle(hProcess);
+            }
+
+            return result;
+        }
+
+        private bool VerifyZelda3Magic(IntPtr hProcess, IntPtr addr)
+        {
+            byte[] buf = new byte[6];
+            IntPtr read;
+            if (ReadProcessMemory(hProcess, addr, buf, 6, out read) && read.ToInt64() == 6) {
+                return Encoding.ASCII.GetString(buf) == "ZELDA3";
+            }
+            return false;
+        }
+
+        private IntPtr FindActiveZelda3Address(IntPtr hProcess, IntPtr mainBase, long mainSize)
+        {
+            IntPtr address = IntPtr.Zero;
+            MEMORY_BASIC_INFORMATION mbi;
+            byte[] searchPattern = Encoding.ASCII.GetBytes("ZELDA3");
+
+            IntPtr bestAddr = IntPtr.Zero;
+            int bestScore = -1;
+
+            long mainStart = mainBase != IntPtr.Zero ? mainBase.ToInt64() : 0;
+            long mainEnd = mainStart > 0 ? mainStart + mainSize : 0;
+
+            while (VirtualQueryEx(hProcess, address, out mbi, (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION))) != 0) {
+                if (mbi.State == MEM_COMMIT && (mbi.Protect == PAGE_READWRITE || mbi.Protect == PAGE_EXECUTE_READWRITE)) {
+                    long regionSize = mbi.RegionSize.ToInt64();
+                    if (regionSize > 0 && regionSize <= 100000000) {
+                        byte[] buffer = new byte[(int)regionSize];
+                        IntPtr read;
+                        if (ReadProcessMemory(hProcess, mbi.BaseAddress, buffer, buffer.Length, out read)) {
+                            int readLen = (int)read.ToInt64();
+                            for (int i = 0; i <= readLen - searchPattern.Length; i += 4) {
+                                if (buffer[i] == 'Z' && buffer[i+1] == 'E' && buffer[i+2] == 'L' && buffer[i+3] == 'D' && buffer[i+4] == 'A' && buffer[i+5] == '3') {
+                                    IntPtr matchAddr = new IntPtr(mbi.BaseAddress.ToInt64() + i);
+                                    IntPtr saveBase = new IntPtr(matchAddr.ToInt64() - 0x24);
+                                    byte[] testBuf = new byte[0x40];
+                                    IntPtr testRead;
+                                    if (ReadProcessMemory(hProcess, saveBase, testBuf, testBuf.Length, out testRead) && testRead.ToInt64() >= 0x38) {
+                                        int day = BitConverter.ToInt32(testBuf, 0x18);
+                                        short hpCap = BitConverter.ToInt16(testBuf, 0x34);
+                                        ushort time = BitConverter.ToUInt16(testBuf, 0x0C);
+
+                                        if (day >= 1 && day <= 10 && hpCap >= 16 && hpCap <= 480) {
+                                            int score = 10;
+                                            long mAddr = matchAddr.ToInt64();
+                                            if (mainStart > 0 && mAddr >= mainStart && mAddr < mainEnd) {
+                                                score += 1000;
+                                            }
+
+                                            if (time == 0x6913 || time == 0x785E || time == 0x85FD) {
+                                                score -= 500;
+                                            }
+
+                                            if (score > bestScore) {
+                                                bestScore = score;
+                                                bestAddr = matchAddr;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                long nextAddr = mbi.BaseAddress.ToInt64() + mbi.RegionSize.ToInt64();
+                if (nextAddr <= address.ToInt64()) break;
+                address = new IntPtr(nextAddr);
+            }
+
+            return bestAddr;
         }
     }
 }
