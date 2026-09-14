@@ -1,0 +1,9 @@
+{
+  "client_id": "1266000000000000000",
+  "process_name": "2ship",
+  "details": "The Legend of Zelda: Majora's Mask",
+  "state": "Playing 2Ship2Harkinian",
+  "large_image": "majora",
+  "large_text": "Majora's Mask",
+  "check_interval_seconds": 3
+}
