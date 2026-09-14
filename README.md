@@ -2,8 +2,6 @@
 
 Automatic Discord Rich Presence status detector for **2Ship2Harkinian** (the PC port of *The Legend of Zelda: Majora's Mask*).
 
-![Majora Icon](majora_icon.jpg)
-
 ---
 
 ## Features
