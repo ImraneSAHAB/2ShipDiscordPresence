@@ -30,32 +30,6 @@ Automatic Discord Rich Presence status detector for **2Ship2Harkinian** (the PC 
 
 ---
 
-## Customizing Your Own Discord Application (Optional)
-
-To have Discord display custom titles or assets:
-
-1. Go to the **[Discord Developer Portal](https://discord.com/developers/applications)**.
-2. Click **"New Application"** and name it **`Majora's Mask`** (or your preferred title).
-3. In **"General Information"**, copy your **Application ID**.
-4. In the `config.json` file, update `"client_id"` with your copied ID:
-   ```json
-   {
-     "client_id": "YOUR_APPLICATION_ID_HERE",
-     "process_name": "2ship",
-     "details": "The Legend of Zelda: Majora's Mask",
-     "state": "Playing 2Ship2Harkinian",
-     "large_image": "icon",
-     "large_text": "Majora's Mask",
-     "small_image": "https://i.imgur.com/Bor9Gtd.png",
-     "small_text": "Made by Imashiro",
-     "hide_console": true,
-     "check_interval_seconds": 3
-   }
-   ```
-5. *(Optional)* Under **"Rich Presence" > "Art Assets"** on the Discord Portal, add custom art assets under key names matching your configuration.
-
----
-
 ## Building from Source
 
 If you modify the source code [`Program.cs`](file:///d:/DEV/Projets/2ShipDiscordPresence/Program.cs), simply run [`build.bat`](file:///d:/DEV/Projets/2ShipDiscordPresence/build.bat) to regenerate `2ShipDiscordPresence.exe`.
