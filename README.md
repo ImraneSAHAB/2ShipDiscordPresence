@@ -1,57 +1,63 @@
 # 2Ship Discord Presence (`2ShipDiscordPresence.exe`)
 
-Détecteur automatique de statut Discord Rich Presence pour **2Ship2Harkinian** (Le portage PC de *The Legend of Zelda: Majora's Mask*).
+Automatic Discord Rich Presence status detector for **2Ship2Harkinian** (the PC port of *The Legend of Zelda: Majora's Mask*).
 
 ![Majora Icon](majora_icon.jpg)
 
 ---
 
-## Fonctionnalités
+## Features
 
-- 🔍 **Détection automatique** : Surveille le processus `2ship.exe` (ou `2Ship2Harkinian.exe`).
-- 🎮 **Présence Discord personnalisée** :
-  - **Titre principal** : `Majora's Mask`
-  - **Détails** : `The Legend of Zelda: Majora's Mask`
-  - **État** : `Playing 2Ship2Harkinian`
-  - **Icône** : Masque de Majora
-  - **Compteur** : Chronomètre de temps de jeu en direct
-- ⚙️ **Fichier `config.json`** : Modifiez à tout moment les textes, l'image ou le `client_id` sans récompiler le logiciel.
-- ⚡ **Léger & Autonome** : Compilé nativement pour Windows, sans Python ni Node.js requis.
-
----
-
-## Utilisation
-
-1. Démarrez **`2ShipDiscordPresence.exe`**.
-2. Lancez votre jeu **`2ship.exe`**.
-3. L'application détecte automatiquement le jeu et active la Présence Discord !
-4. Dès que vous quittez le jeu, le statut Discord est retiré automatiquement.
+- 🔍 **Automatic Detection**: Monitors the `2ship.exe` (or `2Ship2Harkinian.exe`) process.
+- 🎮 **Custom Discord Rich Presence**:
+  - **Main Title**: `Majora's Mask`
+  - **Details**: `The Legend of Zelda: Majora's Mask`
+  - **State**: `Playing 2Ship2Harkinian`
+  - **Small Icon Badge**: Profile picture badge with hover tooltip `"Made by Imashiro"`
+  - **Icon**: Majora's Mask
+  - **Playtime Counter**: Live playtime counter
+- 🔔 **System Tray Integration**: Runs silently in the background with a Majora's Mask icon in the Windows notification area (System Tray). Double-click or right-click to toggle the console or exit.
+- ⚙️ **`config.json` File**: Easily customize status text, images, or `client_id` without recompiling.
+- ⚡ **Lightweight & Standalone**: Native Windows executable, no Python or Node.js required.
 
 ---
 
-## Personnaliser votre propre Application Discord (Optionnel)
+## Usage
 
-Pour que Discord affiche précisément **"Joue à Majora's Mask"** en gras au sommet du profil :
+1. Start **`2ShipDiscordPresence.exe`**.
+2. Launch your game **`2ship.exe`**.
+3. The app automatically detects the game and updates your Discord Presence!
+4. The app runs in your Windows System Tray (near the clock). Right-click the Majora's Mask icon to view status or exit.
+5. As soon as you exit the game, the Discord status is automatically cleared.
 
-1. Rendez-vous sur le **[Portail Développeur Discord](https://discord.com/developers/applications)**.
-2. Cliquez sur **"New Application"** et nommez-la **`Majora's Mask`**.
-3. Dans la section **"General Information"**, copiez l'**Application ID**.
-4. Dans le fichier `config.json`, remplacez `"client_id"` par votre ID copié :
+---
+
+## Customizing Your Own Discord Application (Optional)
+
+To have Discord display custom titles or assets:
+
+1. Go to the **[Discord Developer Portal](https://discord.com/developers/applications)**.
+2. Click **"New Application"** and name it **`Majora's Mask`** (or your preferred title).
+3. In **"General Information"**, copy your **Application ID**.
+4. In the `config.json` file, update `"client_id"` with your copied ID:
    ```json
    {
-     "client_id": "VOTRE_APPLICATION_ID_ICI",
+     "client_id": "YOUR_APPLICATION_ID_HERE",
      "process_name": "2ship",
      "details": "The Legend of Zelda: Majora's Mask",
      "state": "Playing 2Ship2Harkinian",
-     "large_image": "majora",
+     "large_image": "icon",
      "large_text": "Majora's Mask",
+     "small_image": "https://i.imgur.com/Bor9Gtd.png",
+     "small_text": "Made by Imashiro",
+     "hide_console": true,
      "check_interval_seconds": 3
    }
    ```
-5. *(Optionnel)* Dans l'onglet **"Rich Presence" > "Art Assets"** sur le Portail Discord, ajoutez une image sous le nom `majora` (utilisez l'image `majora_icon.jpg` incluse).
+5. *(Optional)* Under **"Rich Presence" > "Art Assets"** on the Discord Portal, add custom art assets under key names matching your configuration.
 
 ---
 
-## Recompilation
+## Building from Source
 
-Si vous modifiez le code source `Program.cs`, double-cliquez simplement sur `build.bat` pour générer à nouveau `2ShipDiscordPresence.exe`.
+If you modify the source code [`Program.cs`](file:///d:/DEV/Projets/2ShipDiscordPresence/Program.cs), simply run [`build.bat`](file:///d:/DEV/Projets/2ShipDiscordPresence/build.bat) to regenerate `2ShipDiscordPresence.exe`.

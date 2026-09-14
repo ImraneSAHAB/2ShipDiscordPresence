@@ -1,8 +1,8 @@
 @echo off
-echo Compilation de 2ShipDiscordPresence.exe en cours...
-"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe /out:2ShipDiscordPresence.exe Program.cs
+echo Building 2ShipDiscordPresence.exe...
+"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /win32icon:app.ico /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:2ShipDiscordPresence.exe Program.cs
 if %errorlevel% equ 0 (
-    echo Compilation reussie : 2ShipDiscordPresence.exe a ete genere avec succes.
+    echo Build succeeded: 2ShipDiscordPresence.exe generated successfully.
 ) else (
-    echo Erreur lors de la compilation.
+    echo Build failed: Error during compilation.
 )

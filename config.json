@@ -1,9 +1,12 @@
 {
-  "client_id": "1266000000000000000",
+  "client_id": "1523531784451653724",
   "process_name": "2ship",
   "details": "The Legend of Zelda: Majora's Mask",
   "state": "Playing 2Ship2Harkinian",
-  "large_image": "majora",
+  "large_image": "icon",
   "large_text": "Majora's Mask",
+  "small_image": "https://i.imgur.com/Bor9Gtd.png",
+  "small_text": "Made by Imashiro",
+  "hide_console": true,
   "check_interval_seconds": 3
 }
