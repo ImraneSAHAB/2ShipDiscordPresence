@@ -152,6 +152,7 @@ namespace TwoShipDiscordPresence
 
             bool wasRunning = false;
             long startTime = 0;
+            string lastLoggedZone = null;
             DiscordRpc rpc = new DiscordRpc();
             GameMemoryReader memReader = new GameMemoryReader();
 
@@ -191,13 +192,45 @@ namespace TwoShipDiscordPresence
                             if (gameData != null && gameData.IsValid) {
                                 string dayStr = FormatDay(gameData.Day);
                                 string timeStr = FormatTime(gameData.Time);
+                                string zoneStr = FormatZone(gameData.Entrance);
 
-                                dynamicDetails = dayStr + " (" + timeStr + ")";
+                                string healthStr;
                                 if (gameData.Health <= 0) {
-                                    dynamicState = "💀 Game Over (0/" + gameData.HealthCapacity + ")";
+                                    healthStr = "💀 Game Over (0/" + gameData.HealthCapacity + ")";
                                 } else {
-                                    dynamicState = "❤️ " + gameData.Health.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + gameData.HealthCapacity;
+                                    healthStr = "❤️ " + gameData.Health.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + gameData.HealthCapacity;
                                 }
+
+                                if (!string.IsNullOrEmpty(zoneStr)) {
+                                    dynamicDetails = zoneStr;
+                                    dynamicState = dayStr + " (" + timeStr + ") • " + healthStr;
+
+                                    if (zoneStr != lastLoggedZone) {
+                                        SafeLog("[" + DateTime.Now.ToString("HH:mm:ss") + "] [ZONE] Player is in: " + zoneStr, ConsoleColor.Magenta);
+                                        lastLoggedZone = zoneStr;
+                                    }
+
+                                    if (trayIcon != null) {
+                                        string tip = "2Ship - " + zoneStr;
+                                        trayIcon.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
+                                    }
+                                    if (statusMenuItem != null) {
+                                        statusMenuItem.Text = "Status: " + zoneStr;
+                                    }
+                                } else {
+                                    dynamicDetails = config.details;
+                                    dynamicState = dayStr + " (" + timeStr + ") • " + healthStr;
+                                    lastLoggedZone = null;
+                                    if (trayIcon != null) trayIcon.Text = "2Ship Presence - Location unavailable";
+                                    if (statusMenuItem != null) statusMenuItem.Text = "Status: Location unavailable";
+                                }
+                            } else {
+                                lastLoggedZone = null;
+                                bool menus = gameData != null && gameData.IsInMenus;
+                                if (menus) dynamicState = "In menus";
+                                string status = menus ? "In menus" : (gameData.Diagnostic ?? "Waiting for game data");
+                                if (trayIcon != null) trayIcon.Text = menus ? "2Ship Presence - In menus" : "2Ship Presence - Waiting for game data";
+                                if (statusMenuItem != null) statusMenuItem.Text = "Status: " + status;
                             }
 
                             string actErr;
@@ -221,6 +254,7 @@ namespace TwoShipDiscordPresence
                         if (wasRunning) {
                             wasRunning = false;
                             startTime = 0;
+                            lastLoggedZone = null;
                             SafeLog("[" + DateTime.Now.ToString("HH:mm:ss") + "] [CLOSED] Process '" + config.process_name + "' has exited.", ConsoleColor.Yellow);
 
                             if (trayIcon != null) {
@@ -239,6 +273,121 @@ namespace TwoShipDiscordPresence
                 }
 
                 Thread.Sleep(config.check_interval_seconds * 1000);
+            }
+        }
+
+        private static string FormatZone(int entrance)
+        {
+            // Save.entrance encodes EntranceSceneId, NOT SceneId.
+            // Source: HarbourMasters/2ship2harkinian, mm/include/z64scene.h
+            // (e8757c14a0fc8701461b0458c9ed72c118bcfc67).
+            // Bits 9-15 select the area; spawn and layer occupy the lower bits.
+            if (entrance < 0 || entrance > ushort.MaxValue) return null;
+            int entranceSceneId = (entrance >> 9) & 0x7F;
+            switch (entranceSceneId) {
+                case 0x00: return "Mayor's Residence (Clock Town)";
+                case 0x01: return "Majora's Lair";
+                case 0x02: return "Potion Shop (Southern Swamp)";
+                case 0x03: return "Ranch House";
+                case 0x04: return "Honey & Darling's Shop (Clock Town)";
+                case 0x05: return "Beneath the Graveyard";
+                case 0x06: return "Southern Swamp (Cleared)";
+                case 0x07: return "Curiosity Shop";
+                case 0x0A: return "Secret Grotto";
+                case 0x0E: return "Cutscene";
+                case 0x10: return "Ikana Canyon";
+                case 0x11: return "Pirates' Fortress";
+                case 0x12: return "Milk Bar";
+                case 0x13: return "Stone Tower Temple";
+                case 0x14: return "Treasure Chest Shop";
+                case 0x15: return "Stone Tower Temple (Inverted)";
+                case 0x16: return "Clock Tower Rooftop";
+                case 0x17: return "Opening Passage";
+                case 0x18: return "Woodfall Temple";
+                case 0x19: return "Path To Mountain Village";
+                case 0x1A: return "Ikana Castle";
+                case 0x1B: return "Deku Scrub Playground";
+                case 0x1C: return "Woodfall Temple (Odolwa)";
+                case 0x1D: return "Town Shooting Gallery";
+                case 0x1E: return "Snowhead Temple";
+                case 0x1F: return "Milk Road";
+                case 0x20: return "Pirates' Fortress (Interior)";
+                case 0x21: return "Swamp Shooting Gallery";
+                case 0x22: return "Pinnacle Rock";
+                case 0x23: return "Fairy Fountain";
+                case 0x24: return "Swamp Spider House";
+                case 0x25: return "Oceanside Spider House";
+                case 0x26: return "Astral Observatory";
+                case 0x27: return "The Moon (Deku Trial)";
+                case 0x28: return "Deku Palace";
+                case 0x29: return "Mountain Smithy";
+                case 0x2A: return "Termina Field";
+                case 0x2B: return "Post Office";
+                case 0x2C: return "Marine Research Lab";
+                case 0x2D: return "Dampe's House";
+                case 0x2F: return "Goron Shrine";
+                case 0x30: return "Zora Hall";
+                case 0x31: return "Trading Post";
+                case 0x32: return "Romani Ranch";
+                case 0x33: return "Stone Tower Temple (Twinmold)";
+                case 0x34: return "Great Bay Coast";
+                case 0x35: return "Zora Cape";
+                case 0x36: return "Lottery Shop";
+                case 0x38: return "Pirates' Fortress (Exterior)";
+                case 0x39: return "Fisherman's Hut";
+                case 0x3A: return "Goron Shop";
+                case 0x3B: return "Deku King's Chamber";
+                case 0x3C: return "The Moon (Goron Trial)";
+                case 0x3D: return "Road To Southern Swamp";
+                case 0x3E: return "Doggy Racetrack";
+                case 0x3F: return "Cucco Shack";
+                case 0x40: return "Ikana Graveyard";
+                case 0x41: return "Snowhead Temple (Goht)";
+                case 0x42: return "Southern Swamp (Poisoned)";
+                case 0x43: return "Woodfall";
+                case 0x44: return "The Moon (Zora Trial)";
+                case 0x45: return "Goron Village (Spring)";
+                case 0x46: return "Great Bay Temple";
+                case 0x47: return "Waterfall Rapids";
+                case 0x48: return "Beneath The Well";
+                case 0x49: return "Zora Hall Rooms";
+                case 0x4A: return "Goron Village (Winter)";
+                case 0x4B: return "Goron Graveyard";
+                case 0x4C: return "Sakon's Hideout";
+                case 0x4D: return "Mountain Village (Winter)";
+                case 0x4E: return "Ghost Hut";
+                case 0x4F: return "Deku Shrine";
+                case 0x50: return "Road To Ikana";
+                case 0x51: return "Swordsman's School (Clock Town)";
+                case 0x52: return "Music Box House";
+                case 0x53: return "Ikana Castle (Igos du Ikana)";
+                case 0x54: return "Tourist Information";
+                case 0x55: return "Stone Tower";
+                case 0x56: return "Stone Tower (Inverted)";
+                case 0x57: return "Mountain Village (Spring)";
+                case 0x58: return "Path To Snowhead";
+                case 0x59: return "Snowhead";
+                case 0x5A: return "Path to Goron Village (Winter)";
+                case 0x5B: return "Path to Goron Village (Spring)";
+                case 0x5C: return "Great Bay Temple (Gyorg)";
+                case 0x5D: return "Secret Shrine";
+                case 0x5E: return "Stock Pot Inn";
+                case 0x5F: return "Great Bay (Cutscene)";
+                case 0x60: return "Clock Tower Interior";
+                case 0x61: return "Woods Of Mystery";
+                case 0x62: return "Lost Woods";
+                case 0x63: return "The Moon (Link Trial)";
+                case 0x64: return "The Moon";
+                case 0x65: return "Bomb Shop";
+                case 0x66: return "Giants' Chamber";
+                case 0x67: return "Gorman Track";
+                case 0x68: return "Goron Racetrack";
+                case 0x69: return "East Clock Town";
+                case 0x6A: return "West Clock Town";
+                case 0x6B: return "North Clock Town";
+                case 0x6C: return "South Clock Town";
+                case 0x6D: return "Laundry Pool";
+                default: return null;
             }
         }
 
@@ -579,190 +728,4 @@ namespace TwoShipDiscordPresence
         }
     }
 
-    public class GameMemoryReader
-    {
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hObject);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern int VirtualQueryEx(IntPtr hProcess, IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
-
-        private const uint PROCESS_VM_READ = 0x0010;
-        private const uint PROCESS_QUERY_INFORMATION = 0x0400;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MEMORY_BASIC_INFORMATION
-        {
-            public IntPtr BaseAddress;
-            public IntPtr AllocationBase;
-            public uint AllocationProtect;
-            public IntPtr RegionSize;
-            public uint State;
-            public uint Protect;
-            public uint Type;
-        }
-
-        private const uint MEM_COMMIT = 0x1000;
-        private const uint PAGE_READWRITE = 0x04;
-        private const uint PAGE_EXECUTE_READWRITE = 0x40;
-
-        public class GameStateData
-        {
-            public bool IsValid;
-            public int Day;
-            public ushort Time;
-            public int Entrance;
-            public double Health;
-            public int HealthCapacity;
-            public byte EquippedMask;
-            public byte PlayerForm;
-        }
-
-        private IntPtr cachedActiveAddr = IntPtr.Zero;
-        private ushort lastObservedTime = 0xFFFF;
-        private int cachedPid = -1;
-
-        public GameStateData ReadGameState(int pid)
-        {
-            GameStateData result = new GameStateData { IsValid = false };
-            if (pid <= 0) return result;
-
-            IntPtr hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid);
-            if (hProcess == IntPtr.Zero) return result;
-
-            try {
-                Process targetProc = Process.GetProcessById(pid);
-                IntPtr mainBase = IntPtr.Zero;
-                long mainSize = 0;
-                try {
-                    ProcessModule mainMod = targetProc.MainModule;
-                    if (mainMod != null) {
-                        mainBase = mainMod.BaseAddress;
-                        mainSize = mainMod.ModuleMemorySize;
-                    }
-                } catch { }
-
-                bool isCachedInMainModule = false;
-                if (cachedActiveAddr != IntPtr.Zero && mainBase != IntPtr.Zero && mainSize > 0) {
-                    long addr = cachedActiveAddr.ToInt64();
-                    long b = mainBase.ToInt64();
-                    isCachedInMainModule = (addr >= b && addr < b + mainSize);
-                }
-
-                if (cachedPid != pid || cachedActiveAddr == IntPtr.Zero || !isCachedInMainModule || !VerifyZelda3Magic(hProcess, cachedActiveAddr)) {
-                    cachedActiveAddr = FindActiveZelda3Address(hProcess, mainBase, mainSize);
-                    cachedPid = pid;
-                }
-
-                if (cachedActiveAddr != IntPtr.Zero) {
-                    IntPtr saveContextBase = new IntPtr(cachedActiveAddr.ToInt64() - 0x24);
-
-                    byte[] buffer = new byte[0x50];
-                    IntPtr bytesRead;
-                    if (ReadProcessMemory(hProcess, saveContextBase, buffer, buffer.Length, out bytesRead) && bytesRead.ToInt64() >= 0x40) {
-                        result.Entrance = BitConverter.ToInt32(buffer, 0x00);
-                        result.EquippedMask = buffer[0x3E];
-                        result.Time = BitConverter.ToUInt16(buffer, 0x0C);
-                        result.Day = BitConverter.ToInt32(buffer, 0x18);
-                        result.PlayerForm = buffer[0x20];
-
-                        short rawCap = BitConverter.ToInt16(buffer, 0x34);
-                        short rawHp = BitConverter.ToInt16(buffer, 0x36);
-
-                        result.HealthCapacity = rawCap > 0 ? (rawCap / 16) : 3;
-                        result.Health = rawHp > 0 ? (rawHp / 16.0) : 0;
-
-                        if (result.Day >= 1 && result.Day <= 10 && result.HealthCapacity >= 1 && result.HealthCapacity <= 30) {
-                            result.IsValid = true;
-                            lastObservedTime = result.Time;
-                        }
-                    }
-                }
-            } catch { }
-            finally {
-                CloseHandle(hProcess);
-            }
-
-            return result;
-        }
-
-        private bool VerifyZelda3Magic(IntPtr hProcess, IntPtr addr)
-        {
-            byte[] buf = new byte[6];
-            IntPtr read;
-            if (ReadProcessMemory(hProcess, addr, buf, 6, out read) && read.ToInt64() == 6) {
-                return Encoding.ASCII.GetString(buf) == "ZELDA3";
-            }
-            return false;
-        }
-
-        private IntPtr FindActiveZelda3Address(IntPtr hProcess, IntPtr mainBase, long mainSize)
-        {
-            IntPtr address = IntPtr.Zero;
-            MEMORY_BASIC_INFORMATION mbi;
-            byte[] searchPattern = Encoding.ASCII.GetBytes("ZELDA3");
-
-            IntPtr bestAddr = IntPtr.Zero;
-            int bestScore = -1;
-
-            long mainStart = mainBase != IntPtr.Zero ? mainBase.ToInt64() : 0;
-            long mainEnd = mainStart > 0 ? mainStart + mainSize : 0;
-
-            while (VirtualQueryEx(hProcess, address, out mbi, (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION))) != 0) {
-                if (mbi.State == MEM_COMMIT && (mbi.Protect == PAGE_READWRITE || mbi.Protect == PAGE_EXECUTE_READWRITE)) {
-                    long regionSize = mbi.RegionSize.ToInt64();
-                    if (regionSize > 0 && regionSize <= 100000000) {
-                        byte[] buffer = new byte[(int)regionSize];
-                        IntPtr read;
-                        if (ReadProcessMemory(hProcess, mbi.BaseAddress, buffer, buffer.Length, out read)) {
-                            int readLen = (int)read.ToInt64();
-                            for (int i = 0; i <= readLen - searchPattern.Length; i += 4) {
-                                if (buffer[i] == 'Z' && buffer[i+1] == 'E' && buffer[i+2] == 'L' && buffer[i+3] == 'D' && buffer[i+4] == 'A' && buffer[i+5] == '3') {
-                                    IntPtr matchAddr = new IntPtr(mbi.BaseAddress.ToInt64() + i);
-                                    IntPtr saveBase = new IntPtr(matchAddr.ToInt64() - 0x24);
-                                    byte[] testBuf = new byte[0x40];
-                                    IntPtr testRead;
-                                    if (ReadProcessMemory(hProcess, saveBase, testBuf, testBuf.Length, out testRead) && testRead.ToInt64() >= 0x38) {
-                                        int day = BitConverter.ToInt32(testBuf, 0x18);
-                                        short hpCap = BitConverter.ToInt16(testBuf, 0x34);
-                                        ushort time = BitConverter.ToUInt16(testBuf, 0x0C);
-
-                                        if (day >= 1 && day <= 10 && hpCap >= 16 && hpCap <= 480) {
-                                            int score = 10;
-                                            long mAddr = matchAddr.ToInt64();
-                                            if (mainStart > 0 && mAddr >= mainStart && mAddr < mainEnd) {
-                                                score += 1000;
-                                            }
-
-                                            if (time == 0x6913 || time == 0x785E || time == 0x85FD) {
-                                                score -= 500;
-                                            }
-
-                                            if (score > bestScore) {
-                                                bestScore = score;
-                                                bestAddr = matchAddr;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                long nextAddr = mbi.BaseAddress.ToInt64() + mbi.RegionSize.ToInt64();
-                if (nextAddr <= address.ToInt64()) break;
-                address = new IntPtr(nextAddr);
-            }
-
-            return bestAddr;
-        }
-    }
 }
-
