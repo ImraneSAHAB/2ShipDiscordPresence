@@ -158,7 +158,13 @@ namespace TwoShipDiscordPresence
                 && capacity <= 320 && capacity % 16 == 0 && health >= 0 && health <= capacity
                 && result.PlayerForm <= 4 && result.Entrance >= 0 && result.Entrance <= ushort.MaxValue;
             result.HealthCapacity = capacity / 16;
-            result.Health = health / 16.0;
+            // 2Ship stores health in sixteenths, while the HUD displays quarters.
+            // The vanilla texture table maps remainders 1-5 to 1/4, 6-10 to 1/2,
+            // and 11-15 to 3/4. Match that visual value in Discord.
+            int fullHearts = health / 16;
+            int remainder = health % 16;
+            int displayedQuarter = remainder == 0 ? 0 : (remainder + 4) / 5;
+            result.Health = fullHearts + (displayedQuarter / 4.0);
             return result;
         }
 
