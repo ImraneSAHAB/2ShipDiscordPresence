@@ -44,6 +44,15 @@ class PresenceTests
         save[0x24] = 0;
         Equal(false, GameMemoryReader.Decode(save, 0x1234, 0).IsValid);
 
+        // The HUD rounds the stored sixteenths to quarter-heart textures.
+        save[0x24] = (byte)'Z';
+        foreach (var sample in new[] { new { Raw = 53, Display = 3.25 }, new { Raw = 54, Display = 3.5 },
+                                       new { Raw = 58, Display = 3.5 }, new { Raw = 59, Display = 3.75 },
+                                       new { Raw = 62, Display = 3.75 }, new { Raw = 63, Display = 3.75 } }) {
+            BitConverter.GetBytes((short)sample.Raw).CopyTo(save, 0x36);
+            Equal(sample.Display, GameMemoryReader.Decode(save, 0x1234, 0).Health);
+        }
+
         // Real ENTRANCE values from 2Ship, deliberately different from SceneId.
         Equal("South Clock Town", Format("FormatZone", 0xD800));
         Equal("East Clock Town", Format("FormatZone", 0xD200));
